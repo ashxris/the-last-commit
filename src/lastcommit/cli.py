@@ -75,6 +75,8 @@ def analyze(
 
         with console.status("[dim]the model is reading the evidence…[/]"):
             narratives = nar.synthesize_narrative(snap, findings, client)
+            narratives["summary"] = nar.synthesize_summary(snap, findings, client)
+            narratives = {k: v for k, v in narratives.items() if v}
             narratives = nar.verify_narrative(narratives, findings, snap)
             roadmap = nar.synthesize_roadmap(snap, findings, client)
         llm_used = bool(narratives or roadmap)

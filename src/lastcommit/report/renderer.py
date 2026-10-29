@@ -6,7 +6,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from ..types import Finding, RepoSnapshot
-from ..analysis.signals import monthly_cadence
+from ..analysis.signals import monthly_cadence, PRETTY_LANG
 
 SECTIONS: list[tuple[str, str]] = [
     ("identity", "Case File — What Was This?"),
@@ -18,6 +18,39 @@ SECTIONS: list[tuple[str, str]] = [
 ]
 
 _SEVERITY_TAG = {1: "note", 2: "notable", 3: "alarming"}
+
+
+def _summary_section(snap: RepoSnapshot, findings: list[Finding], narratives: dict[str, str]) -> str:
+    """Closing summary: verified LLM verdict (if any) over a deterministic digest."""
+    out: list[str] = ["## Summary\n"]
+    verdict = narratives.get("summary")
+    if verdict:
+        out.append(verdict + "\n")
+
+    first, last = snap.first_commit_time, snap.last_commit_time
+    if first and last:
+        total_loc = sum(v for ext, v in snap.languages.items() if ext != ".md")
+        by_lines = sorted(snap.languages.items(), key=lambda kv: -kv[1])
+        stack = ", ".join(PRETTY_LANG.get(ext, ext.lstrip(".")) for ext, _ in by_lines[:3])
+        sev3 = sum(1 for f in findings if f.severity == 3)
+        sev2 = sum(1 for f in findings if f.severity == 2)
+        out.append(
+            f"`{snap.name}` was a {stack} project spanning {first:%B %Y} to {last:%B %Y} — "
+            f"{len(snap.commits)} commits by {len(snap.authors)} author(s), ~{total_loc:,} lines of "
+            f"code, silent since {last:%B %Y}. This scan recorded {len(findings)} findings: "
+            f"{sev3} alarming, {sev2} notable."
+        )
+
+    headlines = sorted(findings, key=lambda f: -f.severity)[:6]
+    if headlines:
+        out.append("\n**The headline findings:**\n")
+        for f in headlines:
+            out.append(f"- **{f.title}** [{f.id}]")
+        out.append("\n_Start below with the Revival Roadmap, or interrogate the former maintainer "
+                   "with `lastcommit interview`._")
+    elif not verdict:
+        return ""  # nothing to say — omit the section
+    return "\n".join(out)
 
 
 def _render_finding(f: Finding) -> str:
@@ -99,6 +132,10 @@ def render_report(
             if table:
                 out.append("**Commit cadence (final months):**\n")
                 out.append(table)
+
+    summary = _summary_section(snap, findings, narratives)
+    if summary:
+        out.append(summary + "\n")
 
     out.append("## Method\n")
     out.append(

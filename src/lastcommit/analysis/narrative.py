@@ -96,6 +96,23 @@ def synthesize_narrative(snap: RepoSnapshot, findings: list[Finding], client: LL
     return sections
 
 
+def synthesize_summary(snap: RepoSnapshot, findings: list[Finding], client: LLMClient) -> str:
+    """The closing verdict paragraph for the Summary section."""
+    prompt = (
+        f"{GROUND_RULES}\n\n## Section to write: Closing Summary\n"
+        "Write the verdict of the autopsy: 3-5 sentences covering what this project was trying "
+        "to be, how and why it probably died, and the one thing a reviver should understand first. "
+        "No headings, no bullet lists — a single tight paragraph.\n\n"
+        f"## Repository: {snap.name} (default branch {snap.default_branch})\n\n"
+        f"## Findings (facts):\n{_findings_json(findings)}\n\nWrite the summary now."
+    )
+    try:
+        text = client.chat_text([{"role": "user", "content": prompt}], temperature=0.4, max_tokens=400)
+    except LLMError:
+        return ""
+    return text.strip()
+
+
 ROADMAP_JSON_RULES = (
     "You are a forensic software archaeologist. The findings below are FACTS "
     "computed from a repository. Propose a revival roadmap. NEVER invent identifiers; cite finding IDs."

@@ -213,8 +213,11 @@ def test_analyze_e2e_deterministic(repo, tmp_path, monkeypatch):
     assert result.exit_code == 0, result.output
     text = out.read_text()
     for heading in ("Case File", "Timeline of Decline", "The Autopsy",
-                    "Anomalies", "Revival Roadmap", "Method"):
+                    "Anomalies", "Revival Roadmap", "Summary", "Method"):
         assert heading in text
+    assert "The headline findings:" in text
+    # summary sits at the bottom, right before Method
+    assert text.index("## Summary") < text.index("## Method")
     assert "Ada Wrench" in text
     assert "feature/parquet-export" in text
     assert "F-0" in text  # finding citations present

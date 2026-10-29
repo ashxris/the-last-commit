@@ -18,9 +18,10 @@ from fixtures import build_abandoned_repo  # noqa: E402
 from lastcommit.analysis.narrative import (  # noqa: E402
     synthesize_narrative,
     synthesize_roadmap,
+    synthesize_summary,
 )
 from lastcommit.analysis.signals import run_all_detectors  # noqa: E402
-from lastcommit.analysis.verify import verify_narrative  # noqa: E402
+from lastcommit.analysis.verify import verify_narrative, verify_text  # noqa: E402
 from lastcommit.index.build import ingest_repository  # noqa: E402
 from lastcommit.interview.persona import ask  # noqa: E402
 from lastcommit.interview.tools import ToolBelt  # noqa: E402
@@ -130,6 +131,21 @@ def test_interview_tool_loop_ends_with_receipts(forensic):
     assert len(history) == 2  # question + answer
     # the tool actually ran: the transcript-level proof is that round 2 happened
     assert state["rounds"] == 1
+
+
+def test_summary_verdict_verified(forensic):
+    snap, _, findings = forensic
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        text = ("The project was a scraper that drowned in its own pools [F-001]. "
+                "Someone dreamed of parquet. Check ffffffffffffff if you doubt me.")
+        return httpx.Response(200, json=_completion({"role": "assistant", "content": text}))
+
+    client = mock_client(handler)
+    raw = synthesize_summary(snap, findings, client)
+    verified, _ = verify_text(raw, findings, snap)
+    assert "[F-001]" in verified
+    assert "ffffffffffffff" not in verified
 
 
 def test_tool_belt_executes_real_git(forensic):
