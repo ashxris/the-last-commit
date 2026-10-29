@@ -11,13 +11,16 @@ from ..index.store import ChunkStore
 from ..ingest import git_history
 
 MAX_TOOL_OUTPUT = 2800
+SLIM_TOOL_OUTPUT = 1200  # web mode: every token of tool output is re-sent each round
 
 
 class ToolBelt:
-    def __init__(self, repo_path: str, store: ChunkStore, embedder: BaseEmbedder | None):
+    def __init__(self, repo_path: str, store: ChunkStore, embedder: BaseEmbedder | None,
+                 slim: bool = False):
         self.repo_path = repo_path
         self.store = store
         self.embedder = embedder
+        self.max_output = SLIM_TOOL_OUTPUT if slim else MAX_TOOL_OUTPUT
 
     # -- schemas -------------------------------------------------------------
     def schemas(self) -> list[dict]:
@@ -34,6 +37,20 @@ class ToolBelt:
                     },
                 },
             }
+
+        if self.max_output == SLIM_TOOL_OUTPUT:
+            # web interview: five terse tools — schemas ride along on every
+            # request, so they must stay small
+            return [
+                fn("search_repo", "Search commits, code, docs, TODOs.",
+                   {"query": {"type": "string"}}, ["query"]),
+                fn("show_commit", "Show a commit's message, author, date, diff.",
+                   {"sha": {"type": "string"}}, ["sha"]),
+                fn("file_at_rev", "Read a file as of a revision.",
+                   {"path": {"type": "string"}, "rev": {"type": "string"}}, ["path"]),
+                fn("timeline", "Commit cadence by month plus the author roster.", {}),
+                fn("list_branches", "All branches with tips and merge status.", {}),
+            ]
 
         return [
             fn("show_commit", "Show a commit's full message, author, date, and diff. "
@@ -66,7 +83,7 @@ class ToolBelt:
             result = self._dispatch(name, args)
         except Exception as exc:
             return f"ERROR: {exc}"
-        return result[:MAX_TOOL_OUTPUT]
+        return result[: self.max_output]
 
     def _dispatch(self, name: str, args: dict) -> str:
         if name == "show_commit":

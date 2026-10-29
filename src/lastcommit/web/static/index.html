@@ -78,6 +78,20 @@
       <article id="report" class="report"></article>
     </section>
 
+    <section id="seance" class="seance" hidden>
+      <h2 class="seance-title">Summon the Maintainer</h2>
+      <p class="seance-note">Ask about the code, the history, the decisions, the ending.
+        Answers are drawn from real commits and end with receipts. Give them a moment —
+        the dead think slowly.</p>
+      <div id="chat-log" class="chat-log" aria-live="polite"></div>
+      <form id="chat-form" class="chat-form" autocomplete="off">
+        <input id="chat-input" type="text" placeholder="Why did the cache layer die?"
+               aria-label="Question for the maintainer" maxlength="500">
+        <button id="chat-btn" type="submit">Whisper</button>
+      </form>
+      <p id="chat-quota" class="quota" hidden></p>
+    </section>
+
     <footer class="foot">
       <p>deterministic forensics · verified citations · no sign-in, no tracking — just five exhumations a day</p>
     </footer>

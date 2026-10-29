@@ -174,6 +174,139 @@ def test_frontend_served(web_client):
         assert web_client.get(asset).status_code == 200
 
 
+def test_slim_toolbelt(tmp_path):
+    from lastcommit.index.build import ingest_repository
+    from lastcommit.index.store import ChunkStore  # noqa: F401
+    from lastcommit.interview.tools import ToolBelt
+    from lastcommit.llm.config import EmbedConfig
+
+    fixture_repo = build_abandoned_repo(tmp_path / "fixture")
+    snap, store, _ = ingest_repository(str(fixture_repo), EmbedConfig(provider="none"))
+    slim = ToolBelt(str(fixture_repo), store, None, slim=True)
+    schemas = slim.schemas()
+    assert len(schemas) == 5
+    assert slim.max_output == 1200
+    full = ToolBelt(str(fixture_repo), store, None)
+    assert len(full.schemas()) == 8
+
+
+def test_web_chat_flow(tmp_path, monkeypatch):
+    """Report → chat: the maintainer answers with receipts, using a tool round."""
+    monkeypatch.setenv("LASTCOMMIT_DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setenv("LASTCOMMIT_EMBED_PROVIDER", "none")
+    from lastcommit.llm.client import LLMClient
+
+    monkeypatch.setattr(LLMClient, "available", lambda self: True)
+    fixture_repo = build_abandoned_repo(tmp_path / "fixture")
+    import lastcommit.web.github as gh
+
+    monkeypatch.setattr(
+        gh, "clone_repo",
+        lambda repo, dest, timeout=None: shutil.copytree(fixture_repo, dest, dirs_exist_ok=True),
+    )
+
+    state = {"rounds": 0}
+
+    def fake_chat(self, messages, tools=None, temperature=0.2, max_tokens=2048):
+        if tools and state["rounds"] == 0:
+            state["rounds"] += 1
+            return {"message": {
+                "content": "",
+                "tool_calls": [{"id": "c1", "type": "function",
+                                "function": {"name": "search_repo",
+                                             "arguments": '{"query": "cache"}'}}],
+            }}
+        return {"message": {"role": "assistant", "content":
+                "We ripped the cache out after it doubled latency. **Receipts:**\n"
+                "- b1b3f97 final known commit"}}
+
+    monkeypatch.setattr(LLMClient, "chat", fake_chat)
+
+    from fastapi.testclient import TestClient
+
+    from lastcommit.web.app import create_app
+
+    client = TestClient(create_app())
+    job = client.post("/api/analyze", json={"url": "https://github.com/ghost/siteswarm"}).json()
+    final = _wait_for_done(client, job["job_id"])
+    assert final["status"] == "done"
+
+    resp = client.post(f"/api/jobs/{job['job_id']}/chat",
+                       json={"question": "Why did the cache layer disappear?"})
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert "Receipts:" in body["answer"] and "cache" in body["answer"].lower()
+    assert body["per_day_limit"] == 20
+    assert state["rounds"] == 1  # the tool actually ran
+
+    transcript = client.get(f"/api/jobs/{job['job_id']}/chat").json()["history"]
+    assert [m["role"] for m in transcript] == ["user", "assistant"]
+
+    # chatting before/without a done report fails cleanly
+    assert client.post("/api/jobs/nope/chat", json={"question": "hi"}).status_code == 404
+
+
+def test_web_chat_quota(tmp_path, monkeypatch):
+    monkeypatch.setenv("LASTCOMMIT_DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setenv("LASTCOMMIT_EMBED_PROVIDER", "none")
+    monkeypatch.setenv("LASTCOMMIT_DAILY_CHAT_PER_IP", "2")
+    from lastcommit.llm.client import LLMClient
+
+    monkeypatch.setattr(LLMClient, "available", lambda self: True)
+    monkeypatch.setattr(
+        LLMClient, "chat",
+        lambda self, messages, tools=None, temperature=0.2, max_tokens=2048:
+        {"message": {"role": "assistant", "content": "hm. **Receipts:**\n- none — the record is silent"}},
+    )
+    fixture_repo = build_abandoned_repo(tmp_path / "fixture")
+    import lastcommit.web.github as gh
+
+    monkeypatch.setattr(
+        gh, "clone_repo",
+        lambda repo, dest, timeout=None: shutil.copytree(fixture_repo, dest, dirs_exist_ok=True),
+    )
+
+    from fastapi.testclient import TestClient
+
+    from lastcommit.web.app import create_app
+
+    client = TestClient(create_app())
+    job = client.post("/api/analyze", json={"url": "https://github.com/ghost/siteswarm"}).json()
+    _wait_for_done(client, job["job_id"])
+    url = f"/api/jobs/{job['job_id']}/chat"
+    assert client.post(url, json={"question": "a"}).status_code == 200
+    assert client.post(url, json={"question": "b"}).status_code == 200
+    third = client.post(url, json={"question": "c"})
+    assert third.status_code == 429
+    assert "whispers" in third.json()["detail"] or "2" in third.json()["detail"]
+
+
+def test_web_chat_needs_llm(tmp_path, monkeypatch):
+    monkeypatch.setenv("LASTCOMMIT_DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setenv("LASTCOMMIT_EMBED_PROVIDER", "none")
+    from lastcommit.llm.client import LLMClient
+
+    monkeypatch.setattr(LLMClient, "available", lambda self: False)
+    fixture_repo = build_abandoned_repo(tmp_path / "fixture")
+    import lastcommit.web.github as gh
+
+    monkeypatch.setattr(
+        gh, "clone_repo",
+        lambda repo, dest, timeout=None: shutil.copytree(fixture_repo, dest, dirs_exist_ok=True),
+    )
+
+    from fastapi.testclient import TestClient
+
+    from lastcommit.web.app import create_app
+
+    client = TestClient(create_app())
+    job = client.post("/api/analyze", json={"url": "https://github.com/ghost/siteswarm"}).json()
+    _wait_for_done(client, job["job_id"])
+    resp = client.post(f"/api/jobs/{job['job_id']}/chat", json={"question": "hello?"})
+    assert resp.status_code == 503
+    assert "cannot be woken" in resp.json()["detail"]
+
+
 def test_failed_job_surfaces_error_and_refunds_quota(tmp_path, monkeypatch):
     """A failed analysis must not consume the daily budget."""
     monkeypatch.setenv("LASTCOMMIT_DATA_DIR", str(tmp_path / "data"))

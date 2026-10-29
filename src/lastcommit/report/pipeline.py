@@ -28,6 +28,19 @@ class AnalysisResult:
     commits: int
     findings: int
     embedder: str | None
+    brief: dict  # identity facts the web interview uses as the persona's memory
+
+
+def _snapshot_brief(snap) -> dict:
+    first, last = snap.first_commit_time, snap.last_commit_time
+    return {
+        "name": snap.name,
+        "branch": snap.default_branch,
+        "first": first.strftime("%Y-%m-%d") if first else "?",
+        "last": last.strftime("%Y-%m-%d") if last else "?",
+        "commits": len(snap.commits),
+        "authors": [a.name for a in sorted(snap.authors.values(), key=lambda a: -a.commit_count)[:8]],
+    }
 
 
 def generate_report(
@@ -82,4 +95,5 @@ def generate_report(
         commits=len(snap.commits),
         findings=len(findings),
         embedder=embedder.name if embedder else None,
+        brief=_snapshot_brief(snap),
     )

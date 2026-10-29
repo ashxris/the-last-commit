@@ -73,6 +73,15 @@ lastcommit web                       # → http://127.0.0.1:8321
 Paste a GitHub repo link, watch the exhumation progress, read the rendered
 markdown report in the page, download it with an explicit button. No sign-in.
 
+**Summon the Maintainer** — under every finished report there's a séance panel:
+ask the former maintainer questions and they answer in character, grounded in
+the report and live git lookups (search, commits + diffs, file revisions,
+branch list), every answer ending with a receipts block. Chat is deliberately
+slimmed for free-tier token budgets (5 tools, 3 tool rounds, capped context):
+expect ~30–90s per answer on Groq's on-demand tier; instant on Dev Tier.
+Separate quotas: 20 questions per IP per day and 100 globally
+(`LASTCOMMIT_DAILY_CHAT_PER_IP`, `LASTCOMMIT_DAILY_CHAT_GLOBAL`).
+
 - **Secrets stay server-side.** The frontend only talks to `/api/*` and never
   sees the Groq key, the git client, or the filesystem.
 - **Rate limits** (persisted server-side in SQLite): 5 reports per IP per day

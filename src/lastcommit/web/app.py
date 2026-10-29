@@ -15,6 +15,9 @@ from fastapi.responses import PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from ..llm.client import LLMClient
+from ..llm.config import load_config
+from .chat import chat_turn
 from .github import parse_github_url
 from .jobs import JobManager
 from .ratelimit import RateLimiter, RateLimitExceeded
@@ -28,6 +31,10 @@ class AnalyzeRequest(BaseModel):
     FastAPI cannot resolve models defined inside a closure."""
 
     url: str
+
+
+class ChatRequest(BaseModel):
+    question: str
 
 
 def _client_ip(request: Request) -> str:
@@ -47,10 +54,17 @@ def create_app() -> FastAPI:
         per_ip_daily=int(os.environ.get("LASTCOMMIT_DAILY_PER_IP", "5")),
         global_daily=int(os.environ.get("LASTCOMMIT_DAILY_GLOBAL", "100")),
     )
+    chat_limiter = RateLimiter(
+        db_path=data_dir / "usage.db",
+        per_ip_daily=int(os.environ.get("LASTCOMMIT_DAILY_CHAT_PER_IP", "20")),
+        global_daily=int(os.environ.get("LASTCOMMIT_DAILY_CHAT_GLOBAL", "100")),
+        prefix="chat:",
+    )
     jobs = JobManager(
         max_workers=int(os.environ.get("LASTCOMMIT_WORKERS", "3")),
         on_failure=limiter.refund,
     )
+    llm = LLMClient(load_config().llm)
 
     # The web app never interviews (no embeddings needed) — keep it light.
     os.environ.setdefault("LASTCOMMIT_EMBED_PROVIDER", "none")
@@ -105,6 +119,43 @@ def create_app() -> FastAPI:
             media_type="text/markdown; charset=utf-8",
             headers={"Content-Disposition": f'attachment; filename="{filename}"'},
         )
+
+    @app.post("/api/jobs/{job_id}/chat")
+    def job_chat(job_id: str, body: ChatRequest, request: Request):
+        job = _job_or_404(job_id)
+        if job.status != "done" or job.markdown is None or not job.dest_dir:
+            raise HTTPException(status_code=409, detail="Exhume the report first — the dead must be "
+                                                        "present before they can speak.")
+        question = body.question.strip()
+        if not question:
+            raise HTTPException(status_code=400, detail="Whisper something first.")
+        if not llm.available():
+            raise HTTPException(status_code=503, detail="The maintainer cannot be woken — no LLM "
+                                                        "host or API key configured.")
+        ip = _client_ip(request)
+        try:
+            chat_left, _ = chat_limiter.consume(ip)
+        except RateLimitExceeded as exc:
+            raise HTTPException(status_code=429, detail=exc.message) from exc
+
+        from ..index.store import ChunkStore
+        from ..interview.tools import ToolBelt
+
+        belt = ToolBelt(job.dest_dir, ChunkStore(job.dest_dir), None, slim=True)
+        answer, new_history = chat_turn(belt, llm, job.brief, job.markdown, job.chat_history, question)
+        job.chat_history = new_history[-20:]
+        return {
+            "answer": answer,
+            "remaining_today": chat_left,
+            "per_day_limit": chat_limiter.per_ip_daily,
+        }
+
+    @app.get("/api/jobs/{job_id}/chat")
+    def job_chat_history(job_id: str):
+        job = _job_or_404(job_id)
+        if job.status != "done":
+            raise HTTPException(status_code=409, detail="Report not ready.")
+        return {"history": job.chat_history}
 
     # API routes are registered first; the static frontend catches the rest.
     app.mount("/", StaticFiles(directory=str(STATIC_DIR), html=True), name="static")

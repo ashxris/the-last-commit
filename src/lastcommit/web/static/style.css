@@ -399,6 +399,109 @@ body::after {
 .report th { color: var(--ember); font-weight: 600; background: rgba(220, 20, 60, 0.06); }
 .report td { color: #ccc3b9; }
 
+/* ---------- seance (chat with the maintainer) ---------- */
+
+.seance {
+  max-width: 860px;
+  margin: 48px auto 0;
+  background: var(--crypt);
+  border: 1px solid rgba(139, 15, 36, 0.45);
+  border-radius: 10px;
+  padding: 26px 32px 30px;
+  box-shadow:
+    0 18px 60px rgba(0, 0, 0, 0.6),
+    0 0 40px rgba(139, 15, 36, 0.15) inset;
+}
+
+.seance-title {
+  margin: 0;
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: 1.3rem;
+  color: var(--blood-bright);
+}
+
+.seance-note {
+  margin: 8px 0 18px;
+  color: var(--bone-dim);
+  font-size: 0.9rem;
+}
+
+.chat-log {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.msg {
+  max-width: 88%;
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-size: 0.94rem;
+  overflow-wrap: break-word;
+}
+.msg.you {
+  align-self: flex-end;
+  background: rgba(220, 20, 60, 0.10);
+  border: 1px solid rgba(220, 20, 60, 0.35);
+  color: var(--bone);
+}
+.msg.ghost {
+  align-self: flex-start;
+  background: #100609;
+  border: 1px solid var(--crypt-edge);
+  color: #ccc3b9;
+}
+.msg.ghost .receipts {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed rgba(220, 20, 60, 0.35);
+  color: var(--bone-dim);
+  font-size: 0.85em;
+}
+.msg p { margin: 0.35em 0; }
+.msg p:first-child { margin-top: 0; }
+.msg p:last-child { margin-bottom: 0; }
+.msg ul { margin: 0.3em 0; padding-left: 1.3em; }
+.msg code { font-family: var(--mono); font-size: 0.86em; background: rgba(220, 20, 60, 0.12); border-radius: 4px; padding: 1px 5px; color: #ff9aa5; }
+.msg .thinking { font-style: italic; color: var(--bone-dim); animation: waver 1.2s ease-in-out infinite alternate; }
+
+@keyframes waver { from { opacity: 0.45; } to { opacity: 1; } }
+
+.chat-form { display: flex; gap: 10px; }
+
+#chat-input {
+  flex: 1;
+  min-width: 0;
+  background: var(--night);
+  border: 1px solid var(--crypt-edge);
+  border-radius: 6px;
+  color: var(--bone);
+  font-family: var(--sans);
+  font-size: 0.95rem;
+  padding: 11px 14px;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+#chat-input::placeholder { color: #5c454b; }
+#chat-input:focus { border-color: var(--crimson-deep); box-shadow: 0 0 0 3px rgba(220, 20, 60, 0.15); }
+
+#chat-btn {
+  background: linear-gradient(180deg, #23090f, #170409);
+  color: var(--ember);
+  border: 1px solid var(--crimson-deep);
+  border-radius: 6px;
+  font-family: var(--serif);
+  font-size: 0.95rem;
+  letter-spacing: 0.08em;
+  padding: 11px 20px;
+  cursor: pointer;
+  transition: box-shadow 0.2s, color 0.2s;
+}
+#chat-btn:hover:not(:disabled) { box-shadow: 0 0 22px rgba(220, 20, 60, 0.35); color: #ff8092; }
+#chat-btn:disabled { opacity: 0.5; cursor: wait; }
+
 /* ---------- footer ---------- */
 
 .foot {
@@ -409,11 +512,12 @@ body::after {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .title, .fog, .bat, .planchette, .moon, .wisp, .drips circle { animation: none; }
+  .title, .fog, .bat, .planchette, .moon, .wisp, .drips circle, .thinking { animation: none; }
 }
 
 @media (max-width: 560px) {
-  .summoning { flex-direction: column; }
-  #exhume-btn { width: 100%; padding: 13px; }
-  .report-card { padding: 20px 18px 26px; }
+  .summoning, .chat-form { flex-direction: column; }
+  #exhume-btn, #chat-btn { width: 100%; padding: 13px; }
+  .report-card, .seance { padding: 20px 18px 26px; }
+  .msg { max-width: 100%; }
 }

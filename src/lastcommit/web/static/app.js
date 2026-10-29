@@ -15,8 +15,15 @@
   var reportEl = $("report");
   var reportRepo = $("report-repo");
   var downloadBtn = $("download-btn");
+  var seance = $("seance");
+  var chatLog = $("chat-log");
+  var chatForm = $("chat-form");
+  var chatInput = $("chat-input");
+  var chatBtn = $("chat-btn");
+  var chatQuota = $("chat-quota");
 
   var pollTimer = null;
+  var currentJobId = null;
 
   function setBusy(busy) {
     btn.disabled = busy;
@@ -52,13 +59,95 @@
   }
 
   function showReport(jobId, repo, markdown) {
+    currentJobId = jobId;
     ouija.hidden = true;
     reportRepo.textContent = repo || "the deceased";
     reportEl.innerHTML = renderMarkdown(markdown);
     downloadBtn.href = "/api/jobs/" + encodeURIComponent(jobId) + "/download";
     reportCard.hidden = false;
+    seance.hidden = false;
+    chatLog.innerHTML = "";
     reportCard.scrollIntoView({ behavior: "smooth", block: "start" });
+    restoreChat(jobId);
   }
+
+  /* ---------- the seance ---------- */
+
+  function chatBubble(kind, markdown) {
+    var div = document.createElement("div");
+    div.className = "msg " + kind;
+    if (markdown !== null && markdown !== undefined) {
+      div.innerHTML = renderMarkdown(markdown);
+    }
+    chatLog.appendChild(div);
+    div.scrollIntoView({ behavior: "smooth", block: "end" });
+    return div;
+  }
+
+  function restoreChat(jobId) {
+    fetch("/api/jobs/" + encodeURIComponent(jobId) + "/chat")
+      .then(function (res) { return res.ok ? res.json() : { history: [] }; })
+      .then(function (data) {
+        (data.history || []).forEach(function (m) {
+          chatBubble(m.role === "user" ? "you" : "ghost", m.content);
+        });
+      })
+      .catch(function () { /* a dead transcript is not fatal */ });
+  }
+
+  function showChatQuota(remaining, limit) {
+    chatQuota.hidden = false;
+    chatQuota.textContent = "";
+    chatQuota.appendChild(document.createTextNode("⸸ "));
+    var strong = document.createElement("span");
+    strong.className = "rest";
+    strong.textContent = remaining + " of " + limit;
+    chatQuota.appendChild(strong);
+    chatQuota.appendChild(document.createTextNode(" whispers left today"));
+  }
+
+  chatForm.addEventListener("submit", function (event) {
+    event.preventDefault();
+    if (!currentJobId) return;
+    var question = chatInput.value.trim();
+    if (!question) return;
+    chatInput.value = "";
+    chatBubble("you", question);
+
+    var thinking = chatBubble("ghost", null);
+    thinking.innerHTML = '<span class="thinking">the maintainer ponders…</span>';
+    chatBtn.disabled = true;
+    chatInput.disabled = true;
+
+    fetch("/api/jobs/" + encodeURIComponent(currentJobId) + "/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question: question }),
+    })
+      .then(function (res) {
+        return res.json().then(function (data) { return { ok: res.ok, status: res.status, data: data }; });
+      })
+      .then(function (reply) {
+        thinking.remove();
+        chatBtn.disabled = false;
+        chatInput.disabled = false;
+        chatInput.focus();
+        if (!reply.ok) {
+          chatBubble("ghost", "*" + (reply.data && reply.data.detail
+            ? reply.data.detail
+            : "the séance was refused (HTTP " + reply.status + ").") + "*");
+          return;
+        }
+        chatBubble("ghost", reply.data.answer);
+        showChatQuota(reply.data.remaining_today, reply.data.per_day_limit);
+      })
+      .catch(function (err) {
+        thinking.remove();
+        chatBtn.disabled = false;
+        chatInput.disabled = false;
+        chatBubble("ghost", "*The connection to the other side dropped: " + err.message + "*");
+      });
+  });
 
   function stopPolling() {
     if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; }

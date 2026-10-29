@@ -20,9 +20,11 @@ class RateLimitExceeded(Exception):
 
 
 class RateLimiter:
-    def __init__(self, db_path: Path, per_ip_daily: int = 5, global_daily: int = 100):
+    def __init__(self, db_path: Path, per_ip_daily: int = 5, global_daily: int = 100,
+                 prefix: str = ""):
         self.per_ip_daily = per_ip_daily
         self.global_daily = global_daily
+        self.prefix = prefix  # lets several limiters share one usage table
         db_path = Path(db_path)
         db_path.parent.mkdir(parents=True, exist_ok=True)
         self.db = sqlite3.connect(db_path, check_same_thread=False)
@@ -46,16 +48,16 @@ class RateLimiter:
         """(per-IP remaining, global remaining) without consuming anything."""
         day = self._today()
         with self._lock:
-            ip_left = self.per_ip_daily - self._count(f"ip:{ip}", day)
-            global_left = self.global_daily - self._count("__global__", day)
+            ip_left = self.per_ip_daily - self._count(f"{self.prefix}ip:{ip}", day)
+            global_left = self.global_daily - self._count(f"{self.prefix}__global__", day)
         return max(ip_left, 0), max(global_left, 0)
 
     def consume(self, ip: str) -> tuple[int, int]:
-        """Atomically consume one report slot for this IP and the global
-        budget.  Raises RateLimitExceeded if either is exhausted."""
+        """Atomically consume one slot for this IP and the global budget.
+        Raises RateLimitExceeded if either is exhausted."""
         day = self._today()
         with self._lock:
-            ip_key, global_key = f"ip:{ip}", "__global__"
+            ip_key, global_key = f"{self.prefix}ip:{ip}", f"{self.prefix}__global__"
             ip_count = self._count(ip_key, day)
             global_count = self._count(global_key, day)
             if ip_count >= self.per_ip_daily:
@@ -82,7 +84,7 @@ class RateLimiter:
         should consume the daily budget."""
         day = self._today()
         with self._lock:
-            for key in (f"ip:{ip}", "__global__"):
+            for key in (f"{self.prefix}ip:{ip}", f"{self.prefix}__global__"):
                 self.db.execute(
                     "UPDATE usage SET count = MAX(count - 1, 0) WHERE key = ? AND day = ?",
                     (key, day),
