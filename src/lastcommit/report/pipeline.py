@@ -61,11 +61,16 @@ def generate_report(
     llm_used = False
     if llm_ok and findings:
         stage("narrate")
-        narratives = nar.synthesize_narrative(snap, findings, client)
-        narratives["summary"] = nar.synthesize_summary(snap, findings, client)
-        narratives = {k: v for k, v in narratives.items() if v}
-        narratives = nar.verify_narrative(narratives, findings, snap)
-        roadmap = nar.synthesize_roadmap(snap, findings, client)
+        try:
+            narratives = nar.synthesize_narrative(snap, findings, client)
+            narratives["summary"] = nar.synthesize_summary(snap, findings, client)
+            narratives = {k: v for k, v in narratives.items() if v}
+            narratives = nar.verify_narrative(narratives, findings, snap)
+            roadmap = nar.synthesize_roadmap(snap, findings, client)
+        except nar.LLMError:
+            # An LLM outage, quota wall, or oversized request must never sink a
+            # report — the deterministic sections stand on their own.
+            narratives, roadmap = {}, ""
         llm_used = bool(narratives or roadmap)
 
     stage("render")

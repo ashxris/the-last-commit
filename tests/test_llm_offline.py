@@ -148,6 +148,75 @@ def test_summary_verdict_verified(forensic):
     assert "ffffffffffffff" not in verified
 
 
+def test_llm_rejection_never_kills_the_report(forensic, monkeypatch):
+    """A 413/429/whatever from the provider degrades to the deterministic
+    report — the job must still finish."""
+    snap, _, findings = forensic
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(413, json={"error": {"message": "Request too large"}})
+
+    client = mock_client(handler)
+    assert synthesize_narrative(snap, findings, client) == {}
+    assert synthesize_summary(snap, findings, client) == ""
+    assert synthesize_roadmap(snap, findings, client) == ""
+
+
+def test_429_honors_retry_then_succeeds(forensic):
+    _, _, _ = forensic
+    state = {"calls": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        state["calls"] += 1
+        if state["calls"] == 1:
+            return httpx.Response(
+                429, headers={"retry-after": "0"},
+                json={"error": {"message": "Rate limit reached"}},
+            )
+        return httpx.Response(200, json=_completion({"role": "assistant", "content": "survived the throttle"}))
+
+    client = mock_client(handler)
+    assert client.chat_text([{"role": "user", "content": "hi"}]) == "survived the throttle"
+    assert state["calls"] == 2
+
+
+def test_429_gives_up_after_bounded_retries(forensic):
+    _, _, _ = forensic
+    state = {"calls": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        state["calls"] += 1
+        return httpx.Response(
+            429, headers={"retry-after": "999"},
+            json={"error": {"message": "Rate limit reached"}},
+        )
+
+    client = mock_client(handler)
+    with pytest.raises(Exception, match="429"):
+        client.chat_text([{"role": "user", "content": "hi"}])
+    assert state["calls"] == 1  # demanded wait exceeds the budget — no retry
+
+
+def test_narrative_prompt_stays_under_budget(forensic):
+    """Huge findings must be shrunk, not shipped — free tiers cap ITPM hard."""
+    snap, _, findings = forensic
+    for f in findings:
+        f.description = "word " * 5000  # ~10k chars each
+        for e in f.evidence:
+            e["label"] = "evidence label " * 100
+
+    seen_sizes = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen_sizes.append(len(request.content))
+        return httpx.Response(200, json=_completion({"role": "assistant", "content": "ok"}))
+
+    client = mock_client(handler)
+    synthesize_narrative(snap, findings, client)
+    assert seen_sizes, "no requests were made"
+    assert max(seen_sizes) <= 21_000, f"prompt too large: {max(seen_sizes)} chars"
+
+
 def test_tool_belt_executes_real_git(forensic):
     snap, store, _ = forensic
     belt = ToolBelt(str(snap.path), store, None)

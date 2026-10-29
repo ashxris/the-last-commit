@@ -76,3 +76,15 @@ class RateLimiter:
                 )
             self.db.commit()
             return self.per_ip_daily - ip_count - 1, self.global_daily - global_count - 1
+
+    def refund(self, ip: str) -> None:
+        """Give a slot back after a failed analysis — only successful reports
+        should consume the daily budget."""
+        day = self._today()
+        with self._lock:
+            for key in (f"ip:{ip}", "__global__"):
+                self.db.execute(
+                    "UPDATE usage SET count = MAX(count - 1, 0) WHERE key = ? AND day = ?",
+                    (key, day),
+                )
+            self.db.commit()

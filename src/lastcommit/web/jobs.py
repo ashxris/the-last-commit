@@ -27,6 +27,7 @@ class Job:
     repo_slug: str = ""
     markdown: str | None = None
     created: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    ip: str = "unknown"
 
     def public(self) -> dict:
         return {
@@ -39,14 +40,17 @@ class Job:
 
 
 class JobManager:
-    def __init__(self, max_workers: int = 3, max_jobs: int = 200):
+    def __init__(self, max_workers: int = 3, max_jobs: int = 200,
+                 on_failure=None):
         self.pool = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="exhume")
         self._jobs: OrderedDict[str, Job] = OrderedDict()
         self._lock = threading.Lock()
         self._max_jobs = max_jobs
+        self._on_failure = on_failure  # fn(ip) -> None, refunds the daily slot
 
-    def create(self, url: str) -> Job:
+    def create(self, url: str, ip: str = "unknown") -> Job:
         job = Job(id=uuid.uuid4().hex[:12], url=url)
+        job.ip = ip
         try:
             repo = gh.parse_github_url(url)
             job.repo_slug = repo.slug
@@ -109,5 +113,10 @@ class JobManager:
                 if job:
                     job.status = "failed"
                     job.error = str(exc)
+            if self._on_failure:
+                try:
+                    self._on_failure(job.ip)
+                except Exception:  # noqa: BLE001 — refund must never crash the worker
+                    pass
         finally:
             shutil.rmtree(dest, ignore_errors=True)

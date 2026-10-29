@@ -47,7 +47,10 @@ def create_app() -> FastAPI:
         per_ip_daily=int(os.environ.get("LASTCOMMIT_DAILY_PER_IP", "5")),
         global_daily=int(os.environ.get("LASTCOMMIT_DAILY_GLOBAL", "100")),
     )
-    jobs = JobManager(max_workers=int(os.environ.get("LASTCOMMIT_WORKERS", "3")))
+    jobs = JobManager(
+        max_workers=int(os.environ.get("LASTCOMMIT_WORKERS", "3")),
+        on_failure=limiter.refund,
+    )
 
     # The web app never interviews (no embeddings needed) — keep it light.
     os.environ.setdefault("LASTCOMMIT_EMBED_PROVIDER", "none")
@@ -65,7 +68,7 @@ def create_app() -> FastAPI:
             ip_left, global_left = limiter.consume(ip)
         except RateLimitExceeded as exc:
             raise HTTPException(status_code=429, detail=exc.message) from exc
-        job = jobs.create(body.url)
+        job = jobs.create(body.url, ip=ip)
         return {
             "job_id": job.id,
             "repo": job.repo_slug,

@@ -26,20 +26,52 @@ in the findings.
 5. Do not use headings; the renderer supplies them."""
 
 
-def _findings_json(findings: list[Finding]) -> str:
+def _findings_json(
+    findings: list[Finding],
+    max_desc: int = 280,
+    max_ev: int = 4,
+    max_label: int = 160,
+) -> str:
     return json.dumps(
         [
             {
                 "id": f.id,
-                "title": f.title,
-                "description": f.description,
+                "title": f.title[:160],
+                "description": f.description[:max_desc],
                 "severity": f.severity,
-                "evidence": [{"ref": e["ref"], "label": e["label"]} for e in f.evidence[:6]],
+                "evidence": [
+                    {"ref": e["ref"], "label": e["label"][:max_label]} for e in f.evidence[:max_ev]
+                ],
             }
             for f in findings
         ],
         indent=1,
     )
+
+
+# Groq free tiers enforce input-tokens-per-minute budgets as low as 7k, so the
+# narrative prompt must stay small.  ~4 chars/token: 20k chars ≈ 5k tokens,
+# leaving headroom for the completion under a 7k ITPM cap.
+MAX_PROMPT_CHARS = 20_000
+SHRINK_STEPS = [  # (max_desc, max_ev, max_label, keep_severity_ge)
+    (120, 3, 100, 1),
+    (100, 2, 80, 2),
+    (80, 2, 60, 3),
+]
+
+
+def _build_prompt(snap: RepoSnapshot, findings: list[Finding], brief: str, extra: str = "") -> str:
+    prompt = (
+        f"{GROUND_RULES}\n\n## Section to write: {brief}\n{extra}"
+        f"## Repository: {snap.name}\n"
+        f"Default branch: {snap.default_branch}. Final state analyzed at HEAD.\n\n"
+    )
+    for max_desc, max_ev, max_label, keep_sev in [(280, 4, 160, 1), *SHRINK_STEPS]:
+        body = _findings_json([f for f in findings if f.severity >= keep_sev], max_desc, max_ev, max_label)
+        candidate = prompt + f"## Findings (facts):\n{body}\n\nWrite the section now."
+        if len(candidate) <= MAX_PROMPT_CHARS or keep_sev == SHRINK_STEPS[-1][-1]:
+            return candidate
+    return candidate  # pragma: no cover
 
 
 SECTION_BRIEFS = {
@@ -77,12 +109,7 @@ def synthesize_narrative(snap: RepoSnapshot, findings: list[Finding], client: LL
         subset = [f for f in findings if f.category == key]
         if not subset:
             continue
-        prompt = (
-            f"{GROUND_RULES}\n\n## Section to write: {section_title}\n{brief}\n\n"
-            f"## Repository: {snap.name}\n"
-            f"Default branch: {snap.default_branch}. Final state analyzed at HEAD.\n\n"
-            f"## Findings (facts):\n{_findings_json(subset)}\n\nWrite the section now."
-        )
+        prompt = _build_prompt(snap, subset, f"{section_title}\n{brief}\n\n")
         try:
             text = client.chat_text(
                 [{"role": "user", "content": prompt}],
@@ -98,13 +125,12 @@ def synthesize_narrative(snap: RepoSnapshot, findings: list[Finding], client: LL
 
 def synthesize_summary(snap: RepoSnapshot, findings: list[Finding], client: LLMClient) -> str:
     """The closing verdict paragraph for the Summary section."""
-    prompt = (
-        f"{GROUND_RULES}\n\n## Section to write: Closing Summary\n"
-        "Write the verdict of the autopsy: 3-5 sentences covering what this project was trying "
-        "to be, how and why it probably died, and the one thing a reviver should understand first. "
-        "No headings, no bullet lists — a single tight paragraph.\n\n"
-        f"## Repository: {snap.name} (default branch {snap.default_branch})\n\n"
-        f"## Findings (facts):\n{_findings_json(findings)}\n\nWrite the summary now."
+    prompt = _build_prompt(
+        snap, findings, "Closing Summary\n",
+        extra="Write the verdict of the autopsy: 3-5 sentences covering what this project was trying "
+              "to be, how and why it probably died, and the one thing a reviver should understand first. "
+              "No headings, no bullet lists — a single tight paragraph.\n\n"
+              "Write the summary now.\n\n",
     )
     try:
         text = client.chat_text([{"role": "user", "content": prompt}], temperature=0.4, max_tokens=400)
@@ -120,16 +146,22 @@ ROADMAP_JSON_RULES = (
 
 
 def synthesize_roadmap(snap: RepoSnapshot, findings: list[Finding], client: LLMClient) -> str:
+    # the roadmap sees every category, so it gets the most compact form and
+    # only the most severe findings
+    ranked = sorted(findings, key=lambda f: -f.severity)[:15]
     prompt = (
         f"{ROADMAP_JSON_RULES}\n\nRepository: {snap.name} (default branch {snap.default_branch}).\n\n"
-        f"## Findings (facts):\n{_findings_json(findings)}\n\n"
+        f"## Findings (facts):\n{_findings_json(ranked, max_desc=140, max_ev=2, max_label=90)}\n\n"
         "Return ONLY a JSON array (no markdown fence) of at most 5 objects with keys: "
         "title, why, first_step, risk, cites (array of finding ids like \"F-001\"). "
         "Rank by revival value; prefer half-finished work the evidence points to."
     )
     import re as _re
 
-    text = client.chat_text([{"role": "user", "content": prompt}], temperature=0.3, max_tokens=1200)
+    try:
+        text = client.chat_text([{"role": "user", "content": prompt}], temperature=0.3, max_tokens=1200)
+    except LLMError:
+        return ""  # the deterministic roadmap fallback takes over
     m = _re.search(r"\[.*\]", text, _re.DOTALL)
     if not m:
         return ""

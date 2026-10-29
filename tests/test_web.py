@@ -80,6 +80,16 @@ def test_rate_limiter_persists_across_instances(tmp_path):
         reborn.consume("9.9.9.9")
 
 
+def test_rate_limiter_refund_restores_slot(tmp_path):
+    limiter = RateLimiter(tmp_path / "usage.db", per_ip_daily=1, global_daily=1)
+    limiter.consume("4.4.4.4")
+    with pytest.raises(RateLimitExceeded):
+        limiter.consume("4.4.4.4")
+    limiter.refund("4.4.4.4")
+    ip_left, global_left = limiter.consume("4.4.4.4")
+    assert ip_left == 0 and global_left == 0  # both counters refunded
+
+
 # ---------------------------------------------------------------- app flow
 
 
@@ -164,16 +174,45 @@ def test_frontend_served(web_client):
         assert web_client.get(asset).status_code == 200
 
 
-def test_failed_job_surfaces_error(web_client, monkeypatch):
+def test_failed_job_surfaces_error_and_refunds_quota(tmp_path, monkeypatch):
+    """A failed analysis must not consume the daily budget."""
+    monkeypatch.setenv("LASTCOMMIT_DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setenv("LASTCOMMIT_EMBED_PROVIDER", "none")
+    monkeypatch.setattr("lastcommit.llm.client.LLMClient.available", lambda self: False)
+    fixture_repo = build_abandoned_repo(tmp_path / "fixture")
     import lastcommit.web.github as gh
+
+    monkeypatch.setattr(
+        gh, "clone_repo",
+        lambda repo, dest, timeout=None: shutil.copytree(fixture_repo, dest, dirs_exist_ok=True),
+    )
+
+    from fastapi.testclient import TestClient
+
+    from lastcommit.web.app import create_app
+
+    client = TestClient(create_app())
+
+    ok = client.post("/api/analyze", json={"url": "https://github.com/ghost/siteswarm"})
+    assert ok.status_code == 200
+    assert ok.json()["remaining_today"] == 4
 
     def boom(repo, dest, timeout=None):
         raise RuntimeError("the crypt collapsed")
 
     monkeypatch.setattr(gh, "clone_repo", boom)
-    resp = web_client.post("/api/analyze", json={"url": "https://github.com/ghost/siteswarm"})
-    final = _wait_for_done(web_client, resp.json()["job_id"])
+    failed = client.post("/api/analyze", json={"url": "https://github.com/ghost/siteswarm"})
+    final = _wait_for_done(client, failed.json()["job_id"])
     assert final["status"] == "failed"
     assert "crypt collapsed" in final["error"]
-    # a failed job must not be downloadable
-    assert web_client.get(f"/api/jobs/{resp.json()['job_id']}/report").status_code == 409
+    assert client.get(f"/api/jobs/{failed.json()['job_id']}/report").status_code == 409
+
+    # the failed job refunded its slot: the next POST sees 3 remaining
+    # (5 − 1 success − 1 now in flight), not 2
+    monkeypatch.setattr(
+        gh, "clone_repo",
+        lambda repo, dest, timeout=None: shutil.copytree(fixture_repo, dest, dirs_exist_ok=True),
+    )
+    third = client.post("/api/analyze", json={"url": "https://github.com/ghost/siteswarm"})
+    assert third.status_code == 200
+    assert third.json()["remaining_today"] == 3
