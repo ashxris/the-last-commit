@@ -21,7 +21,7 @@ uv sync          # or: pip install -e .
 ## Configure (optional)
 
 The chat model is any OpenAI-compatible endpoint; the default is Groq's
-`llama-3.3-70b-versatile` (bring your own open-weight model via vLLM, Ollama, llama.cpp…).
+`qwen/qwen3.8-27b` (bring your own open-weight model via vLLM, Ollama, llama.cpp…).
 
 ```bash
 export GROQ_API_KEY=...            # or OPENAI_API_KEY / LASTCOMMIT_API_KEY
@@ -32,7 +32,7 @@ Or write `~/.config/lastcommit/config.toml`:
 ```toml
 [llm]
 base_url = "https://api.groq.com/openai/v1"
-model = "llama-3.3-70b-versatile"
+model = "qwen/qwen3.8-27b"
 # api_key = "..."
 
 [embed]

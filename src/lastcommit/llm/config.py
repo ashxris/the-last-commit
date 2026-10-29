@@ -17,7 +17,7 @@ from pathlib import Path
 CONFIG_PATH = Path.home() / ".config" / "lastcommit" / "config.toml"
 
 DEFAULT_LLM_BASE_URL = "https://api.groq.com/openai/v1"
-DEFAULT_LLM_MODEL = "llama-3.3-70b-versatile"
+DEFAULT_LLM_MODEL = "qwen/qwen3.8-27b"
 
 
 @dataclass
