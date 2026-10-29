@@ -48,6 +48,10 @@ lastcommit interview /path/to/abandoned-repo    # interrogate the former maintai
 lastcommit ingest /path/to/abandoned-repo       # debugging: findings summary only
 ```
 
+Analyzing a remote repository: clone it **with full history** (never `--depth 1` — the
+forensics read the commit graph), then point `lastcommit` at the clone. Remote-tracking
+branches are picked up automatically, so stranded work on unmerged branches is still found.
+
 `analyze` works fully **without** an LLM (`--no-llm`, or when no key is configured):
 every finding is computed deterministically from git + tree-sitter + docs, and the
 model only ever adds narrative and the roadmap, constrained to cite finding IDs.

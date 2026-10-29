@@ -74,11 +74,27 @@ def _iter_local_branches(repo: pygit2.Repository):
         yield name, repo.branches.local[name]
 
 
-def _all_tips(repo: pygit2.Repository) -> list[tuple[str, pygit2.Oid]]:
-    """Every commit tip we know about: local branches + detached HEAD."""
-    tips: dict[str, pygit2.Oid] = {}
+def list_branch_tips(repo: pygit2.Repository) -> list[tuple[str, pygit2.Oid]]:
+    """Every branch tip worth walking: local branches plus remote-tracking
+    refs (a fresh clone only has one local branch, so remote refs are where
+    the stranded work lives).  Deduped by commit — local names win."""
+    tips: dict[pygit2.Oid, str] = {}
     for name, ref in _iter_local_branches(repo):
-        tips[f"refs/heads/{name}"] = ref.target
+        tips.setdefault(ref.target, name)
+    for ref_name in repo.references:
+        if ref_name.startswith("refs/remotes/") and not ref_name.endswith("/HEAD"):
+            try:
+                target = repo.references[ref_name].target
+            except (KeyError, pygit2.GitError):
+                continue
+            remote_name = ref_name.replace("refs/remotes/", "")
+            tips.setdefault(target, remote_name)
+    return [(name, target) for target, name in tips.items()]
+
+
+def _all_tips(repo: pygit2.Repository) -> list[tuple[str, pygit2.Oid]]:
+    """Every commit tip we know about: all branch tips + detached HEAD."""
+    tips = {f"refs/heads/{name}": target for name, target in list_branch_tips(repo)}
     try:
         tips["HEAD"] = repo.head.target
     except (KeyError, pygit2.GitError):
@@ -187,19 +203,19 @@ def extract_git_history(repo_path: str) -> RepoSnapshot:
         for c in repo.walk(head, pygit2.GIT_SORT_TOPOLOGICAL):
             reachable.add(str(c.id))
     branches: list[BranchInfo] = []
-    for name, ref in _iter_local_branches(repo):
-        tip = repo[ref.target]
+    for name, target in list_branch_tips(repo):
+        tip = repo[target]
         if not isinstance(tip, pygit2.Commit):
             continue
-        count = sum(1 for _ in repo.walk(ref.target, pygit2.GIT_SORT_TOPOLOGICAL))
+        count = sum(1 for _ in repo.walk(target, pygit2.GIT_SORT_TOPOLOGICAL))
         branches.append(
             BranchInfo(
                 name=name,
-                tip_sha=str(ref.target),
+                tip_sha=str(target),
                 tip_summary=(tip.message.strip().splitlines() or [""])[0][:120],
                 tip_time=utc(tip.committer.time),
                 commit_count=count,
-                merged=str(ref.target) in reachable,
+                merged=str(target) in reachable,
             )
         )
     branches.sort(key=lambda b: (b.merged, b.tip_time), reverse=False)

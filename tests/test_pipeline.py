@@ -55,6 +55,20 @@ def test_dangling_branch_detected(snapshot):
     assert "parquet export draft" in dangling[0].tip_summary
 
 
+def test_cloned_remote_repo_keeps_branch_forensics(repo, tmp_path):
+    """A fresh clone has only one local branch; remote-tracking refs must
+    still surface the stranded work."""
+    import subprocess
+
+    clone = tmp_path / "clone"
+    subprocess.run(["git", "clone", "-q", str(repo), str(clone)], check=True)
+    cloned = extract_git_history(str(clone))
+    assert len(cloned.commits) == 9
+    dangling = [b for b in cloned.branches if not b.merged]
+    assert [b.name for b in dangling] == ["origin/feature/parquet-export"]
+    assert "parquet export draft" in dangling[0].tip_summary
+
+
 def test_head_sha(snapshot):
     assert len(snapshot.head_sha) == 40
 

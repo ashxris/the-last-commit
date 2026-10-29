@@ -128,12 +128,16 @@ class ToolBelt:
         try:
             import pygit2
 
+            from ..ingest.git_history import list_branch_tips
+
             repo = pygit2.Repository(self.repo_path)
             lines = []
-            for name in repo.branches.local:
-                ref = repo.branches.local[name]
-                tip = repo[ref.target]
-                lines.append(f"- {name}: tip {str(ref.target)[:7]} “{tip.message.strip().splitlines()[0][:80]}”")
+            for name, target in list_branch_tips(repo):
+                tip = repo[target]
+                if not isinstance(tip, pygit2.Commit):
+                    continue
+                summary = tip.message.strip().splitlines()[0][:80]
+                lines.append(f"- {name}: tip {str(target)[:7]} “{summary}”")
             return "\n".join(lines) or "No branches."
         except Exception as exc:
             return f"ERROR: {exc}"
