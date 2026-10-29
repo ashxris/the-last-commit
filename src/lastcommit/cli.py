@@ -47,7 +47,10 @@ def _make_client(no_llm: bool):
 @app.command()
 def analyze(
     repo: str = typer.Argument(..., help="Path to the repository to autopsy."),
-    out: str = typer.Option(None, "--out", "-o", help="Where to write the report (default <repo>/.lastcommit/report.md)."),
+    out: str = typer.Option(
+        None, "--out", "-o",
+        help="Where to write the report (default ~/Downloads/lastcommit-<repo>-report.md).",
+    ),
     no_llm: bool = typer.Option(False, "--no-llm", help="Skip narrative synthesis; deterministic report only."),
     verbose: bool = typer.Option(False, "--verbose", "-v"),
 ) -> None:
@@ -80,7 +83,11 @@ def analyze(
     from .report.renderer import render_report
 
     report = render_report(snap, findings, narratives, roadmap, llm_used)
-    out_path = Path(out) if out else repo_path / ".lastcommit" / "report.md"
+    if out:
+        out_path = Path(out).expanduser()
+    else:
+        downloads = Path.home() / "Downloads"
+        out_path = downloads / f"lastcommit-{snap.name}-report.md"
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(report, encoding="utf-8")
 

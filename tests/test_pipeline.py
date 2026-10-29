@@ -218,3 +218,20 @@ def test_analyze_e2e_deterministic(repo, tmp_path, monkeypatch):
     assert "Ada Wrench" in text
     assert "feature/parquet-export" in text
     assert "F-0" in text  # finding citations present
+
+
+def test_report_defaults_to_downloads(repo, tmp_path, monkeypatch):
+    """Without --out the report goes to ~/Downloads, not into the repo."""
+    monkeypatch.setenv("LASTCOMMIT_EMBED_PROVIDER", "none")
+    monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
+    from typer.testing import CliRunner
+
+    from lastcommit.cli import app
+
+    result = CliRunner().invoke(app, ["analyze", str(repo), "--no-llm"])
+    assert result.exit_code == 0, result.output
+    expected = tmp_path / "Downloads" / f"lastcommit-{repo.name}-report.md"
+    assert expected.exists()
+    assert "Case File" in expected.read_text()
+    # the analyzed repo gets an index but no report
+    assert not (repo / ".lastcommit" / "report.md").exists()

@@ -43,10 +43,14 @@ model = "BAAI/bge-small-en-v1.5"        # or provider = "ollama", model = "nomic
 ## Use
 
 ```bash
-lastcommit analyze /path/to/abandoned-repo      # forensic report → <repo>/.lastcommit/report.md
+lastcommit analyze /path/to/abandoned-repo      # forensic report → ~/Downloads/lastcommit-<repo>-report.md
 lastcommit interview /path/to/abandoned-repo    # interrogate the former maintainer
 lastcommit ingest /path/to/abandoned-repo       # debugging: findings summary only
 ```
+
+The report is written to your Downloads folder by default (override with `--out`). The analyzed
+repo only ever gains a `.lastcommit/` folder with the disposable retrieval index and any
+interview transcripts — delete it freely, it rebuilds on the next run.
 
 Analyzing a remote repository: clone it **with full history** (never `--depth 1` — the
 forensics read the commit graph), then point `lastcommit` at the clone. Remote-tracking
