@@ -129,9 +129,25 @@ def web(
     port: int = typer.Option(8321, "--port", help="Port to serve on."),
 ) -> None:
     """Serve the web app (frontend + API) from one process."""
+    import socket
+
     import uvicorn
 
     from .web.app import create_app
+
+    family = socket.AF_INET6 if ":" in host else socket.AF_INET
+    probe = socket.socket(family, socket.SOCK_STREAM)
+    try:
+        probe.bind((host, port))
+    except OSError:
+        console.print(
+            f"[red]Port {port} on {host} is already in use.[/] Is an older `lastcommit web` "
+            f"still running? Stop it with `pkill -f 'lastcommit web'`, or serve elsewhere: "
+            f"`lastcommit web --port {port + 1}`"
+        )
+        raise typer.Exit(1) from None
+    finally:
+        probe.close()
 
     console.print(Panel(f"The Last Commit — [bold]http://{host}:{port}[/]", border_style="green"))
     uvicorn.run(create_app(), host=host, port=port, log_level="info")
