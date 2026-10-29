@@ -137,7 +137,8 @@ def web(
 
     family = socket.AF_INET6 if ":" in host else socket.AF_INET
     probe = socket.socket(family, socket.SOCK_STREAM)
-    try:
+    probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)  # match uvicorn, so
+    try:                                                         # TIME_WAIT remnants don't lie
         probe.bind((host, port))
     except OSError:
         console.print(
