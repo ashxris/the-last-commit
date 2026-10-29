@@ -61,6 +61,31 @@ every finding is computed deterministically from git + tree-sitter + docs, and t
 model only ever adds narrative and the roadmap, constrained to cite finding IDs.
 A machine verifier strips any claim referencing evidence that doesn't exist.
 
+## Web app
+
+The same engine ships as a self-contained web app (FastAPI backend + a no-build
+vanilla frontend, dark and lightly haunted):
+
+```bash
+lastcommit web                       # → http://127.0.0.1:8321
+```
+
+Paste a GitHub repo link, watch the exhumation progress, read the rendered
+markdown report in the page, download it with an explicit button. No sign-in.
+
+- **Secrets stay server-side.** The frontend only talks to `/api/*` and never
+  sees the Groq key, the git client, or the filesystem.
+- **Rate limits** (persisted server-side in SQLite): 5 reports per IP per day
+  and 100 reports per day globally — configurable via `LASTCOMMIT_DAILY_PER_IP`
+  and `LASTCOMMIT_DAILY_GLOBAL`.
+- **Deployment knobs**: `LASTCOMMIT_DATA_DIR` (usage db location),
+  `LASTCOMMIT_WORKERS` (parallel analyses), `LASTCOMMIT_CLONE_TIMEOUT`,
+  `LASTCOMMIT_TRUST_PROXY=1` when behind a reverse proxy that sets
+  `X-Forwarded-For`, `GROQ_API_KEY` as usual. Without a key the app still
+  produces deterministic reports.
+- Only `github.com` URLs are accepted; clones run in a temp dir with a hard
+  timeout and full history (the forensics read the commit graph).
+
 ## How it works
 
 ```

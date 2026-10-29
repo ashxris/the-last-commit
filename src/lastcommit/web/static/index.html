@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Last Commit — exhume a dead repository</title>
+  <meta name="description" content="An AI archaeologist for abandoned repositories. Paste a GitHub link, get the forensic report.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🪦</text></svg>">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+  <!-- atmosphere -->
+  <div class="moon" aria-hidden="true"></div>
+  <div class="fog fog-a" aria-hidden="true"></div>
+  <div class="fog fog-b" aria-hidden="true"></div>
+  <svg class="web web-tl" viewBox="0 0 200 200" aria-hidden="true">
+    <g fill="none" stroke="currentColor" stroke-width="1">
+      <path d="M0 0 L200 200 M0 0 L200 120 M0 0 L120 200 M0 0 L200 60 M0 0 L60 200 M0 0 L200 20 M0 0 L20 200"/>
+      <path d="M28 28 Q 40 20 56 33 Q 74 48 95 44 M56 33 Q 60 48 95 44"/>
+      <path d="M60 60 Q 76 50 98 68 Q 122 88 148 82 M98 68 Q 104 88 148 82"/>
+      <path d="M100 100 Q 120 88 148 112 Q 178 138 200 132 M148 112 Q 156 138 200 132"/>
+    </g>
+  </svg>
+  <svg class="bat bat-1" viewBox="0 0 64 32" aria-hidden="true">
+    <path fill="currentColor" d="M32 14 C28 6 20 2 12 4 C16 8 16 12 12 16 C20 14 24 18 26 24 C28 20 30 18 32 18 C34 18 36 20 38 24 C40 18 44 14 52 16 C48 12 48 8 52 4 C44 2 36 6 32 14 Z"/>
+  </svg>
+  <svg class="bat bat-2" viewBox="0 0 64 32" aria-hidden="true"><use href="#bat"/></svg>
+  <svg class="bat bat-3" viewBox="0 0 64 32" aria-hidden="true"><use href="#bat"/></svg>
+  <svg width="0" height="0" aria-hidden="true"><defs><path id="bat" fill="currentColor" d="M32 14 C28 6 20 2 12 4 C16 8 16 12 12 16 C20 14 24 18 26 24 C28 20 30 18 32 18 C34 18 36 20 38 24 C40 18 44 14 52 16 C48 12 48 8 52 4 C44 2 36 6 32 14 Z"/></defs></svg>
+
+  <main class="graveyard">
+    <header class="rite">
+      <h1 class="title">The Last Commit</h1>
+      <p class="tagline">An AI archaeologist for abandoned repositories.<br>
+        Hand it a dead repo and it will tell you how it died — then help you bring it back.</p>
+    </header>
+
+    <form id="exhume-form" class="summoning" autocomplete="off">
+      <input id="repo-url" type="url" required
+             placeholder="https://github.com/ghost/abandoned-repo"
+             aria-label="GitHub repository URL" spellcheck="false">
+      <button id="exhume-btn" type="submit">Exhume</button>
+    </form>
+    <p id="quota" class="quota" hidden></p>
+
+    <section id="ouija" class="ouija" hidden aria-live="polite">
+      <div class="planchette"></div>
+      <p id="stage" class="stage">Digging up the repository…</p>
+    </section>
+
+    <section id="epitaph" class="epitaph" hidden aria-live="assertive"></section>
+
+    <section id="report-card" class="report-card" hidden>
+      <div class="report-head">
+        <h2 id="report-repo" class="report-repo"></h2>
+        <a id="download-btn" class="download" href="#" download>
+          Download report <span aria-hidden="true">⚰</span>
+        </a>
+      </div>
+      <article id="report" class="report"></article>
+    </section>
+
+    <footer class="foot">
+      <p>deterministic forensics · verified citations · no sign-in, no tracking — just five exhumations a day</p>
+    </footer>
+  </main>
+
+  <script src="/vendor/marked.min.js" defer></script>
+  <script src="/vendor/purify.min.js" defer></script>
+  <script src="/app.js" defer></script>
+</body>
+</html>

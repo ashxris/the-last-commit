@@ -16,6 +16,8 @@ dependencies = [
     "rich>=13.0",
     "httpx>=0.27",
     "fastembed>=0.4",
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
 ]
 
 [project.scripts]
