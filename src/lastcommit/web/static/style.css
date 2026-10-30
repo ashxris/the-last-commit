@@ -223,7 +223,7 @@ body::after {
   display: flex;
   gap: 12px;
   max-width: 620px;
-  margin: 0 auto;
+  margin: 38px auto 0;  /* breathing room under the drip line */
 }
 
 #repo-url {
@@ -365,7 +365,15 @@ body::after {
 .download:hover { box-shadow: 0 0 20px rgba(220, 20, 60, 0.4); color: #ff8092; }
 
 /* rendered markdown */
-.report { font-size: 0.98rem; }
+.report { font-size: 0.98rem; overflow-wrap: break-word; }
+.report table {
+  display: block;
+  border-collapse: collapse;
+  margin: 1em 0;
+  width: fit-content;
+  max-width: 100%;
+  overflow-x: auto;   /* cadence tables scroll instead of bursting the card */
+}
 .report h1 { font-family: var(--serif); font-size: 1.6rem; color: var(--bone); margin: 1.4em 0 0.6em; }
 .report h1:first-child { margin-top: 0; }
 .report h2 {
@@ -409,7 +417,9 @@ body::after {
   font-style: italic;
 }
 .report hr { border: none; border-top: 1px solid var(--crypt-edge); margin: 2em 0; }
-.report table { border-collapse: collapse; margin: 1em 0; width: auto; }
+.report code, .msg code {
+  overflow-wrap: anywhere;  /* long shas and paths must wrap, not push */
+}
 .report th, .report td { border: 1px solid var(--crypt-edge); padding: 6px 14px; text-align: left; }
 .report th { color: var(--ember); font-weight: 600; background: rgba(220, 20, 60, 0.06); }
 .report td { color: #ccc3b9; }
@@ -524,6 +534,24 @@ body::after {
   text-align: center;
   color: #5e4247;
   font-size: 0.8rem;
+}
+
+/* ---------- responsive ---------- */
+
+@media (max-width: 640px) {
+  .graveyard { padding: 6vh 18px 60px; }
+  .moon { width: 300px; height: 300px; top: -110px; right: -110px; }
+  .web { width: 150px; height: 150px; }
+  .gh-link { top: 16px; right: 16px; }
+  .gh-link svg { width: 26px; height: 26px; }
+  .summoning, .ouija, .epitaph { margin-top: 30px; }
+  .report-card, .seance { margin-top: 34px; }
+  #repo-url, #chat-input { font-size: 16px; }  /* ≥16px so iOS Safari doesn't zoom inputs on focus */
+}
+
+@media (max-width: 420px) {
+  .title { font-size: clamp(1.15rem, 6.4vw, 1.8rem); }
+  .tagline { font-size: 0.95rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {
