@@ -164,6 +164,14 @@ body::after {
 
 .rite { text-align: center; margin-bottom: 8px; }
 
+.subtitle {
+  margin: 10px 0 6px;
+  color: var(--bone-dim);
+  font-size: 0.9rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
 .title {
   font-family: var(--display);
   font-weight: 400;
@@ -303,6 +311,20 @@ body::after {
   font-family: var(--serif);
   font-style: italic;
   color: var(--bone-dim);
+}
+
+.stage-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  text-align: left;
+}
+
+.stage-note {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--ash);
+  font-family: var(--mono);
 }
 
 /* ---------- epitaph (errors) ---------- */

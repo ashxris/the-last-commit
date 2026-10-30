@@ -40,6 +40,7 @@
   <main class="graveyard">
     <header class="rite">
       <h1 class="title">The Last Commit</h1>
+      <p class="subtitle">An AI archaeologist for abandoned repositories</p>
       <svg class="drips" viewBox="0 0 600 34" preserveAspectRatio="none" aria-hidden="true">
         <rect width="600" height="6" fill="currentColor"/>
         <g fill="currentColor">
@@ -55,8 +56,7 @@
           <circle cx="542.5" cy="18" r="3"/>
         </g>
       </svg>
-      <p class="tagline">An AI archaeologist for abandoned repositories.<br>
-        Hand it a dead repo and it will tell you how it died, help you bring it back —
+      <p class="tagline">Hand it a dead repo and it will tell you how it died, help you bring it back —
         and let you chat with the maintainer's ghost.</p>
     </header>
 
@@ -70,7 +70,10 @@
 
     <section id="ouija" class="ouija" hidden aria-live="polite">
       <div class="planchette"></div>
-      <p id="stage" class="stage">Digging up the repository…</p>
+      <div class="stage-wrap">
+        <p id="stage" class="stage">Digging up the repository…</p>
+        <p class="stage-note">This might take 2–4 minutes — the dead think slowly.</p>
+      </div>
     </section>
 
     <section id="epitaph" class="epitaph" hidden aria-live="assertive"></section>

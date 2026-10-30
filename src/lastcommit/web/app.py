@@ -159,4 +159,15 @@ def create_app() -> FastAPI:
 
     # API routes are registered first; the static frontend catches the rest.
     app.mount("/", StaticFiles(directory=str(STATIC_DIR), html=True), name="static")
+
+    @app.middleware("http")
+    async def revalidate_static(request: Request, call_next):
+        """The UI iterates quickly — make browsers revalidate HTML/CSS/JS
+        instead of serving stale copies from cache."""
+        response = await call_next(request)
+        path = request.url.path
+        if path == "/" or path.endswith((".css", ".js")):
+            response.headers["Cache-Control"] = "no-cache"
+        return response
+
     return app
