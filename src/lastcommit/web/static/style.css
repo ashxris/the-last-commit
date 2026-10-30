@@ -168,7 +168,7 @@ body::after {
   margin: 10px 0 6px;
   color: var(--bone-dim);
   font-size: 0.9rem;
-  letter-spacing: 0.22em;
+  letter-spacing: 0.13em;
   text-transform: uppercase;
 }
 
