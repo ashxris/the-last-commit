@@ -60,6 +60,21 @@ body::after {
 
 /* ---------- atmosphere ---------- */
 
+.gh-link {
+  position: fixed;
+  top: 22px;
+  right: 26px;
+  z-index: 4;
+  color: rgba(221, 214, 201, 0.5);
+  transition: color 0.2s, filter 0.2s, transform 0.2s;
+}
+.gh-link:hover {
+  color: var(--ember);
+  filter: drop-shadow(0 0 10px rgba(220, 20, 60, 0.6));
+  transform: scale(1.1);
+}
+.gh-link svg { width: 30px; height: 30px; display: block; }
+
 .moon {
   position: fixed;
   top: -160px; right: -160px;
