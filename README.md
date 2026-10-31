@@ -14,9 +14,17 @@ branches pulled live from the history — and every answer ends with a receipts 
 
 ## Install
 
+Get the code, then install — this creates a private environment with every
+dependency the project needs, including the `lastcommit` command:
+
 ```bash
+git clone https://github.com/ashxris/the-last-commit.git
+cd the-last-commit
 uv sync          # or: pip install -e .
 ```
+
+No git installed? Use the green **Code** button on the repo page to download a
+ZIP, unzip it, `cd` into the folder, and run the install line from there.
 
 ## Configure (optional)
 
