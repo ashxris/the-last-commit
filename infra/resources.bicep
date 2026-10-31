@@ -36,12 +36,14 @@ resource serverFarm 'Microsoft.Web/serverfarms@2023-12-01' = {
   name: planName
   location: location
   kind: 'linux'
-  reserved: true
   sku: {
     name: 'B1'
     capacity: 1
   }
   tags: tags
+  properties: {
+    reserved: true   // marks the plan as Linux
+  }
 }
 
 resource webSite 'Microsoft.Web/sites@2023-12-01' = {
