@@ -11,4 +11,4 @@ services:
     docker:
       path: ./Dockerfile
       context: ./
-      platform: linux/amd64   # App Service B1 is amd64; keep builds consistent from ARM Macs
+      remoteBuild: true   # build in Azure via ACR Tasks — no local Docker needed
