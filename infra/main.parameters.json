@@ -1,0 +1,15 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "name": {
+      "value": "${AZURE_ENV_NAME}"
+    },
+    "siteName": {
+      "value": "lastcommit-app"
+    },
+    "groqApiKey": {
+      "value": "${GROQ_API_KEY}"
+    }
+  }
+}

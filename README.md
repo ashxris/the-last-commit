@@ -105,6 +105,31 @@ Separate quotas: 20 questions per IP per day and 100 globally
 - Only `github.com` URLs are accepted; clones run in a temp dir with a hard
   timeout and full history (the forensics read the commit graph).
 
+### Deploy on Azure with the Azure Developer CLI (always-on)
+
+The repo ships with everything `azd` needs (`azure.yaml` + `infra/*.bicep`):
+an App Service plan **B1** (Linux, Always On), the App Service site
+`https://lastcommit-app.azurewebsites.net`, and a container registry for the
+image. Cost: ~$18/month — true 24/7 within the free trial credits, but the
+credits run out around month 5–6 and it starts billing the subscription.
+
+```bash
+brew install azure/azd/azd     # or see the azd install docs for other platforms
+azd auth login
+azd init                       # enter an environment name, e.g. lastcommit
+azd up                         # pick subscription + region, paste your GROQ_API_KEY
+```
+
+CI/CD: `azd pipeline config` creates federated credentials and wires GitHub
+Actions (`.github/workflows/azure-dev.yml`) so every push to `main`
+re-provisions and redeploys. Add your key once as a repo secret:
+`gh secret set GROQ_API_KEY`.
+
+`LASTCOMMIT_TRUST_PROXY=1` is pre-set on the site: Azure's front end writes the
+real client IP into `X-Forwarded-For`, and the app keys rate limits off the
+entry closest to the trusted proxy — forged client headers are ignored. Daily
+counters live on `/home/data`, which persists across restarts and redeploys.
+
 ## How it works
 
 ```

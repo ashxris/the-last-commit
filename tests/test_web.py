@@ -174,6 +174,34 @@ def test_frontend_served(web_client):
         assert web_client.get(asset).status_code == 200
 
 
+def test_xff_last_entry_wins_under_trust_proxy(tmp_path, monkeypatch):
+    """With LASTCOMMIT_TRUST_PROXY=1, the app trusts the LAST X-Forwarded-For
+    entry — the one the trusted edge proxy saw. A client can forge earlier
+    entries, but not the hop the proxy appends."""
+    import sqlite3
+
+    monkeypatch.setenv("LASTCOMMIT_DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setenv("LASTCOMMIT_EMBED_PROVIDER", "none")
+    monkeypatch.setenv("LASTCOMMIT_TRUST_PROXY", "1")
+
+    from fastapi.testclient import TestClient
+
+    from lastcommit.web.app import create_app
+
+    client = TestClient(create_app())
+    resp = client.post(
+        "/api/analyze",
+        json={"url": "https://github.com/octocat/Hello-World"},
+        headers={"X-Forwarded-For": "6.6.6.6, 203.0.113.7"},  # forged + real client
+    )
+    assert resp.status_code == 200
+
+    db = sqlite3.connect(tmp_path / "data" / "usage.db")
+    keys = {row[0] for row in db.execute("SELECT key FROM usage")}
+    assert "ip:203.0.113.7" in keys
+    assert "ip:6.6.6.6" not in keys
+
+
 def test_slim_toolbelt(tmp_path):
     from lastcommit.index.build import ingest_repository
     from lastcommit.index.store import ChunkStore  # noqa: F401

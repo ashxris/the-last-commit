@@ -1,0 +1,14 @@
+# Azure Developer CLI project file — `azd up` provisions the infrastructure
+# in infra/ and deploys the backend container to App Service.
+name: the-last-commit
+metadata:
+  template: the-last-commit@0.0.1
+services:
+  backend:
+    project: ./
+    language: docker
+    host: appservice
+    docker:
+      path: ./Dockerfile
+      context: ./
+      platform: linux/amd64   # App Service B1 is amd64; keep builds consistent from ARM Macs

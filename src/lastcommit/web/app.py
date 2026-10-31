@@ -7,7 +7,6 @@ sees an API key, the git client, or the filesystem.
 from __future__ import annotations
 
 import os
-import re
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
@@ -23,7 +22,6 @@ from .jobs import JobManager
 from .ratelimit import RateLimiter, RateLimitExceeded
 
 STATIC_DIR = Path(__file__).parent / "static"
-FWD_FOR_RE = re.compile(r"^\s*([0-9a-fA-F:.]+)")
 
 
 class AnalyzeRequest(BaseModel):
@@ -41,9 +39,12 @@ def _client_ip(request: Request) -> str:
     if os.environ.get("LASTCOMMIT_TRUST_PROXY", "") == "1":
         fwd = request.headers.get("x-forwarded-for")
         if fwd:
-            m = FWD_FOR_RE.match(fwd)
-            if m:
-                return m.group(1)
+            entries = [e.strip() for e in fwd.split(",") if e.strip()]
+            if entries:
+                # Trust the LAST entry: it is what the trusted edge proxy saw.
+                # A client can forge earlier entries, but not the hop the proxy
+                # appends (or the single value it overwrites X-Forwarded-For with).
+                return entries[-1]
     return request.client.host if request.client else "unknown"
 
 
