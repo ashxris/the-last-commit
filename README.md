@@ -113,17 +113,24 @@ an App Service plan **B1** (Linux, Always On), the App Service site
 image. Cost: ~$18/month — true 24/7 within the free trial credits, but the
 credits run out around month 5–6 and it starts billing the subscription.
 
+Azure for Students subscriptions can't run ACR remote builds, so the image is
+built in **GitHub Actions** instead (`.github/workflows/azure-dev.yml`):
+build → push to the registry → roll out to App Service on every push to `main`.
+
 ```bash
 brew install azure/azd/azd     # or see the azd install docs for other platforms
 azd auth login
 azd init                       # enter an environment name, e.g. lastcommit
-azd up                         # pick subscription + region, paste your GROQ_API_KEY
+azd provision                  # pick subscription + region, paste your GROQ_API_KEY
+azd pipeline config            # wires GitHub Actions OIDC credentials
+gh secret set GROQ_API_KEY     # one-time: the key for CI deploys
+gh workflow run "Deploy to Azure"   # or just push to main
 ```
 
-CI/CD: `azd pipeline config` creates federated credentials and wires GitHub
-Actions (`.github/workflows/azure-dev.yml`) so every push to `main`
-re-provisions and redeploys. Add your key once as a repo secret:
-`gh secret set GROQ_API_KEY`.
+`LASTCOMMIT_TRUST_PROXY=1` is pre-set on the site: Azure's front end writes the
+real client IP into `X-Forwarded-For`, and the app keys rate limits off the
+entry closest to the trusted proxy — forged client headers are ignored. Daily
+counters live on `/home/data`, which persists across restarts and redeploys.
 
 `LASTCOMMIT_TRUST_PROXY=1` is pre-set on the site: Azure's front end writes the
 real client IP into `X-Forwarded-For`, and the app keys rate limits off the

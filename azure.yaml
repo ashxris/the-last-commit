@@ -1,5 +1,9 @@
-# Azure Developer CLI project file — `azd up` provisions the infrastructure
-# in infra/ and deploys the backend container to App Service.
+# Azure Developer CLI project file — `azd provision` creates/updates the
+# infrastructure in infra/ (App Service plan B1 + site + container registry).
+#
+# Image builds and deploys run in GitHub Actions
+# (.github/workflows/azure-dev.yml): Azure for Students subscriptions cannot
+# run ACR remote builds, and local builds would require a Docker install.
 name: the-last-commit
 metadata:
   template: the-last-commit@0.0.1
@@ -8,7 +12,3 @@ services:
     project: ./
     language: docker
     host: appservice
-    docker:
-      path: ./Dockerfile
-      context: ./
-      remoteBuild: true   # build in Azure via ACR Tasks — no local Docker needed
