@@ -12,6 +12,8 @@ interviewing its former maintainer.** The persona answers in first person with a
 fallible human memory, but every claim is grounded in real commits, files, and
 branches pulled live from the history — and every answer ends with a receipts block.
 
+![The Last Commit — web app: paste a GitHub repo link and exhume its report](docs/preview.png)
+
 ## Install
 
 Get the code, then install — this creates a private environment with every
